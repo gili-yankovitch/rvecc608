@@ -1,4 +1,4 @@
-SRCS:=src/main.c src/prot.c
+SRCS:=src/main.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c
 
 # Check if riscv64-unknown-elf-gcc exists
 ifneq ($(shell which riscv64-unknown-elf-gcc),)
@@ -29,7 +29,7 @@ MINICHLINK?=minichlink
 WRITE_SECTION?=flash
 SYSTEM_C?=src/framework/ch32v003fun.c
 
-CFLAGS:=$(CFLAGS) -g -Os -flto -ffunction-sections -fdata-sections -fmessage-length=0 -msmall-data-limit=8 -Isrc/include/ -Isrc/framework/include/
+CFLAGS:=$(CFLAGS) -g -Os -flto -ffunction-sections -fdata-sections -fmessage-length=0 -msmall-data-limit=8 -Isrc/include/ -Isrc/framework/include/ -Iext/micro-ecc/ -Iext/tiny-aes-c/
 
 CFLAGS_ARCH+=-march=rv32ec -mabi=ilp32e -DCH32V003=1
 GENERATED_LD_FILE?=src/framework/generated_ch32v003.ld
