@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -7,7 +8,8 @@
 #define FLASH_MODEKEYR ((volatile uint32_t *)0x40022024)
 #define FLASH_CTLR ((volatile uint32_t *)0x40022010)
 #define FLASH_STATR ((volatile uint32_t *)0x4002200C)
-#define FLASH_FLOCK   ((volatile uint32_t*)0x40022020)
+#define FLASH_OBR ((volatile uint32_t *)0x4002201C)
+#define FLASH_WPR ((volatile uint32_t *)0x40022020)
 #define RDPRT_KEY 0x000000A5
 #ifndef FLASH_KEY1
 #define FLASH_KEY1 0x45670123
@@ -28,6 +30,7 @@
 #define FLASH_BUFLOAD_BIT    (1 << 18)
 #define FLASH_FTER_BIT       (1 << 17)
 #define FLASH_FTPG_BIT       (1 << 16)
+#define FLASH_FLOCK_BIT      (1 << 15)
 #define FLASH_STRT_BIT       (1 << 6)
 #define FLASH_LOCK_BIT       (1 << 7) // LOCK bit
 #define FLASH_PER_BIT        (1 << 1) // Page Erase bit
@@ -36,27 +39,26 @@
 #define FLASH_EOP_BIT        (1 << 5) // End of programming bit
 
 
-static void flashFlockUnlock()
+static inline void flashFlockUnlock()
 {
     *FLASH_MODEKEYR = FLASH_KEY1;
     *FLASH_MODEKEYR = FLASH_KEY2;
-    *FLASH_FLOCK = 0x00000000; // Unlock Flash if locked
 }
 
 static inline void flashFlockLock()
 {
-    *FLASH_FLOCK = 0x1; // Unlock Flash if locked
+    *FLASH_CTLR |= FLASH_FLOCK_BIT;
 }
 
-static void flashUnlock()
+static inline void flashUnlock()
 {
     *FLASH_KEYR = FLASH_KEY1;
     *FLASH_KEYR = FLASH_KEY2;
 }
 
-void flashLock()
+static inline void flashLock()
 {
-    *FLASH_CTLR |= FLASH_LOCK_BIT;  // Set LOCK bit
+    *FLASH_CTLR |= FLASH_LOCK_BIT;
 }
 
 static inline void flashUnlockOBKEYR()
@@ -75,7 +77,7 @@ static inline void disableFlashProgramming()
     *FLASH_CTLR &= ~FLASH_PG_BIT; // Set PG bit
 }
 
-static inline void flashBusy()
+void flashBusy()
 {
     while (((*FLASH_STATR) & FLASH_BSY_BIT)) ;
 }
@@ -90,6 +92,7 @@ void flashPageErase(uint32_t address)
 {
     // #1
     flashUnlock();
+    flashBusy();
 
     // #2
     flashFlockUnlock();
@@ -109,8 +112,13 @@ void flashPageErase(uint32_t address)
     // #7
     flashEOP();
 
+    *FLASH_CTLR &= ~FLASH_FTER_BIT;
+
     flashFlockLock();
+    flashBusy();
+
     flashLock();
+    flashBusy();
 }
 
 void _flashPageErase(uint32_t address)
@@ -135,16 +143,17 @@ void _flashPageErase(uint32_t address)
     flashLock();  // Lock flash again
 }
 
-uint32_t flashRead(uint32_t addr)
+void flashRead(uint32_t addr, void * pdata, size_t len)
 {
-    return *(volatile uint32_t *)addr;
+    memcpy(pdata, (void *)addr, len);
 }
 
-void flashWrite(uint32_t addr, uint32_t * data)
+#define WRITE_BLOCK_SIZE 64
+
+void _flashWrite(uint32_t addr, uint32_t * data)
 {
     int i;
 
-    // Unlock Flash if needed
     flashUnlock();
     flashBusy();
 
@@ -166,28 +175,101 @@ void flashWrite(uint32_t addr, uint32_t * data)
     }
 
     *FLASH_ADDR = addr;
+    flashEOP();
 
     *FLASH_CTLR |= FLASH_STRT_BIT;
-
     flashEOP();
 
     *FLASH_CTLR &= ~FLASH_FTPG_BIT;
 
     flashFlockLock();
+    flashBusy();
 
     flashLock();
+    flashBusy();
 }
 
-#define RAM_ADDR 0x20000000
-#define RAM_SIZE 0x800
-void _flashWrite(uint32_t addr, uint16_t data)
+void flashWrite(uint32_t addr, void * pdata, size_t len)
 {
-    void (* fptr)(uint32_t addr, uint16_t data) = (void *)RAM_ADDR;
+    int i;
+    uint8_t tmp[WRITE_BLOCK_SIZE] = { 0 };
+    uint32_t unalignedBytes = addr & (WRITE_BLOCK_SIZE - 1);
+    uint8_t * data = pdata;
 
-    // Copy function to RAM
-    memcpy(fptr, _flashWrite, RAM_SIZE);
+#ifdef DEBUG
+    printf("Writing address %lx nbytes %d\r\n", addr, len);
+#endif
 
-    fptr(addr, data);
+    // Is the address unaligned?
+    if (unalignedBytes)
+    {
+#ifdef DEBUG
+        printf("Writing address %lx nbytes %ld UNALIGNED BYTES\r\n", addr - unalignedBytes, WRITE_BLOCK_SIZE - unalignedBytes);
+#endif
+
+        // Read the original data
+        flashRead(addr - unalignedBytes, &tmp, WRITE_BLOCK_SIZE);
+
+        // Erase the page
+        flashPageErase(addr - unalignedBytes);
+
+        // Write unaligned bytes
+        memcpy((uint8_t *)tmp + unalignedBytes, data, WRITE_BLOCK_SIZE - unalignedBytes);
+
+        // Rewrite the data
+        _flashWrite(addr - unalignedBytes, (uint32_t *)tmp);
+
+        // Decrease the number of unaligned bytes
+        len -= WRITE_BLOCK_SIZE - unalignedBytes;
+
+        // Update write addr
+        addr += WRITE_BLOCK_SIZE - unalignedBytes;
+
+        // Update data pointer
+        data += WRITE_BLOCK_SIZE - unalignedBytes;
+    }
+
+#ifdef DEBUG
+    printf("Writing address %lx nbytes %d ALIGNED BYTES\r\n", addr, (len / WRITE_BLOCK_SIZE) * WRITE_BLOCK_SIZE);
+#endif
+
+    // Write the remaining aligned bytes
+    for (i = 0; i < len / WRITE_BLOCK_SIZE; i++)
+    {
+        flashPageErase(addr);
+
+        // Write 4 bytes at a time
+        _flashWrite(addr, (uint32_t *)data);
+
+#ifdef DEBUG
+        printf("ALIGNED BYTES: 0x%lx\r\n", *((uint32_t *)data));
+        printf("ALIGNED BYTES: 0x%lx\r\n", *((uint32_t *)addr));
+#endif
+        // Update addresses
+        addr += WRITE_BLOCK_SIZE;
+        data += WRITE_BLOCK_SIZE;
+    }
+
+    // Decrease the number of bytes from len
+    len -= i * WRITE_BLOCK_SIZE;
+
+    // Is there something left to write?
+    if (len)
+    {
+#ifdef DEBUG
+        printf("Writing address %lx nbytes %d REMAINING BYTES\r\n", addr, len);
+#endif
+        // Read remaining data
+        flashRead(addr, &tmp, WRITE_BLOCK_SIZE);
+
+        flashPageErase(addr);
+
+        // Write the rest of the data
+        memcpy(tmp, data, len);
+
+        // Write back to flash
+        _flashWrite(addr, (uint32_t *)tmp);
+    }
 }
 
 static void userSelectProg()

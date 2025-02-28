@@ -4,7 +4,7 @@
 int flashReadProtect();
 int flashReadUnprotect();
 void flashPageErase(uint32_t address);
-uint32_t flashRead(uint32_t addr);
-void flashWrite(uint32_t addr, uint32_t * data);
+void flashRead(uint32_t addr, void * pdata, size_t len);
+void flashWrite(uint32_t addr, void * pdata, size_t len);
 
 #endif // __PROT_H__
