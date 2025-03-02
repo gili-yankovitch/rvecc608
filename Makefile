@@ -1,4 +1,4 @@
-SRCS:=src/main.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c
+SRCS:=src/main.c src/i2c.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c
 
 # Check if riscv64-unknown-elf-gcc exists
 ifneq ($(shell which riscv64-unknown-elf-gcc),)

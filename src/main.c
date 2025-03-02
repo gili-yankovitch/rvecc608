@@ -5,9 +5,15 @@
 #include <prot.h>
 #include <uECC.h>
 #include <aes.h>
+#include <i2c.h>
 
 #define FLASH_ADDR 0x08000000
 #define FLASH_SIZE 0x00004000
+
+static int readAnalog()
+{
+    return SysTick->CNT ^ GPIO_analogRead(GPIOv_from_PORT_PIN(GPIO_port_D, 3));
+}
 
 static int RNG(uint8_t *dest, unsigned size)
 {
@@ -17,9 +23,9 @@ static int RNG(uint8_t *dest, unsigned size)
   while (size) {
     uint8_t val = 0;
     for (unsigned i = 0; i < 8; ++i) {
-      int init = GPIO_analogRead(GPIOv_from_PORT_PIN(GPIO_port_D, 3));
+      int init = readAnalog() ^ SysTick->CNT;
       int count = 0;
-      while (GPIO_analogRead(GPIOv_from_PORT_PIN(GPIO_port_D, 3)) == init) {
+      while (readAnalog() == init) {
         ++count;
       }
 
@@ -113,6 +119,7 @@ static void cryptoTest()
     aesTest();
 }
 
+
 int main()
 {
     uint32_t addr;
@@ -142,7 +149,16 @@ int main()
 
     GPIO_ADCinit();
 
-	GPIO_pinMode(GPIOv_from_PORT_PIN(GPIO_port_D, 3), GPIO_pinMode_I_analog, GPIO_Speed_In);
+	GPIO_pinMode(GPIOv_from_PORT_PIN(GPIO_port_D, 3),
+	    GPIO_pinMode_I_analog,
+	    GPIO_Speed_In);
+
+    if (i2cSetup() < 0)
+    {
+        printf("ERROR: Error setting up I2C\r\n");
+
+        goto done;
+    }
 
     // Lock flash from external read/write
     // flashReadProtect();
@@ -178,7 +194,7 @@ int main()
 
     printf("[READ #2] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr, rdata);
 
-
+done:
     for (;;) ;
 
     return 0;
