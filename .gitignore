@@ -1,1 +1,3 @@
 firmware*
+src/*.d
+src/*.o

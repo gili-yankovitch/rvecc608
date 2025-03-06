@@ -1,4 +1,5 @@
-SRCS:=src/main.c src/i2c.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c
+SRCS:=src/main.c src/i2c.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c src/atecc608xx.c
+OBJS:=$(SRCS:.c=.o)
 
 # Check if riscv64-unknown-elf-gcc exists
 ifneq ($(shell which riscv64-unknown-elf-gcc),)
@@ -29,7 +30,7 @@ MINICHLINK?=minichlink
 WRITE_SECTION?=flash
 SYSTEM_C?=src/framework/ch32v003fun.c
 
-CFLAGS:=$(CFLAGS) -g -Os -flto -ffunction-sections -fdata-sections -fmessage-length=0 -msmall-data-limit=8 -Isrc/include/ -Isrc/framework/include/ -Iext/micro-ecc/ -Iext/tiny-aes-c/
+CFLAGS:=$(CFLAGS) -MMD -MP -g -Os -flto -ffunction-sections -fdata-sections -fmessage-length=0 -msmall-data-limit=8 -Isrc/include/ -Isrc/framework/include/ -Iext/micro-ecc/ -Iext/tiny-aes-c/
 
 CFLAGS_ARCH+=-march=rv32ec -mabi=ilp32e -DCH32V003=1
 GENERATED_LD_FILE?=src/framework/generated_ch32v003.ld
@@ -46,7 +47,7 @@ CFLAGS+= \
 	-I. -Wall $(EXTRA_CFLAGS)
 
 LDFLAGS+=-T $(LINKER_SCRIPT) -Wl,--gc-sections
-FILES_TO_COMPILE:=$(SYSTEM_C) $(SRCS)
+FILES_TO_COMPILE:=$(SYSTEM_C) $(OBJS)
 
 all: firmware.elf
 
@@ -59,6 +60,9 @@ FLASH_COMMAND?=$(MINICHLINK) -c /dev/ttyACM0 -w $< $(WRITE_SECTION) -b
 
 $(GENERATED_LD_FILE) :
 	$(PREFIX)-gcc -E -P -x c -DTARGET_MCU=$(TARGET_MCU) -DMCU_PACKAGE=$(MCU_PACKAGE) -DTARGET_MCU_LD=$(TARGET_MCU_LD) src/framework/ch32v003fun.ld > $(GENERATED_LD_FILE)
+
+%.o: %.c
+	$(PREFIX)-gcc -c $< -o $@ $(CFLAGS)
 
 $(TARGET).elf : $(FILES_TO_COMPILE) $(LINKER_SCRIPT) $(EXTRA_ELF_DEPENDENCIES)
 	$(PREFIX)-gcc -o $@ $(FILES_TO_COMPILE) $(CFLAGS) $(LDFLAGS)
@@ -74,9 +78,11 @@ flash : $(TARGET).bin
 	$(FLASH_COMMAND)
 
 clean :
-	rm -rf $(TARGET).elf $(TARGET).bin $(TARGET).hex $(TARGET).lst $(TARGET).map $(TARGET).hex || true
+	rm -rf $(TARGET).elf $(TARGET).bin $(TARGET).hex $(TARGET).lst $(TARGET).map $(TARGET).hex src/*.o || true
 
 erase :
 	$(MINICHLINK) -p
 
 build : $(TARGET).bin
+
+.PHONY: src/framework/include/i2c_slave.h

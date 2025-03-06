@@ -6,6 +6,7 @@
 #include <uECC.h>
 #include <aes.h>
 #include <i2c.h>
+#include <atecc608xx.h>
 
 #define FLASH_ADDR 0x08000000
 #define FLASH_SIZE 0x00004000
@@ -160,6 +161,8 @@ int main()
         goto done;
     }
 
+    printf("i2c Setup Complete\r\n");
+
     // Lock flash from external read/write
     // flashReadProtect();
 
@@ -167,7 +170,7 @@ int main()
 
     // Optional: For blinking LED
     funPinMode(PC3, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP);
-
+#if 0
     uECC_set_rng(&RNG);
     cryptoTest();
 
@@ -193,9 +196,12 @@ int main()
     flashRead(addr, &rdata, sizeof(rdata));
 
     printf("[READ #2] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr, rdata);
-
+#endif
 done:
-    for (;;) ;
+    for (;;)
+    {
+        handleRequest();
+    }
 
     return 0;
 }
