@@ -42,19 +42,8 @@ struct _i2cSlave
     uint8_t readOffset;
     i2c_write_callback_t writeCb;
     i2c_read_callback_t readCb;
-#if 0
-    uint8_t position;
-    uint8_t size1;
-    volatile uint8_t* volatile registers2;
-    uint8_t size2;
-    bool read_only1;
-    i2c_write_callback_t write_callback2;
-    i2c_read_callback_t read_callback2;
-    bool read_only2;
-    bool writing;
-#endif
 
-    bool address2matched;
+    // bool address2matched;
 } i2cSlave;
 
 #endif
