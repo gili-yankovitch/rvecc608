@@ -10,13 +10,21 @@ struct atecc608xx_protocol_s
     uint8_t len;
     uint8_t opcode;
     uint8_t param1;
-    uint8_t param2;
+    uint16_t param2;
     uint8_t data[250];
 };
 
-extern struct atecc608xx_protocol_s req;
-extern bool reqFlag;
+extern volatile struct atecc608xx_protocol_s req;
+extern volatile bool reqFlag;
 int handleRequest();
+
+/* Zone IDs */
+#define ZONE_CONFIG 0x00
+#define ZONE_OTP 0x01
+#define ZONE_DATA 0x02
+
+/* Slots number */
+#define SLOTS_CONFIG_NUM 16
 
 /* Protocol Indices */
 #define ATRCC508A_PROTOCOL_FIELD_COMMAND 0
@@ -39,7 +47,7 @@ int handleRequest();
 #define COMMAND_OPCODE_RANDOM   0x1B // Create and return a random number (32 bytes of data)
 #define COMMAND_OPCODE_READ     0x02 // Return data at a specific zone and address.
 #define COMMAND_OPCODE_WRITE    0x12 // Return data at a specific zone and address.
-#define COMMAND_OPCODE_SHA              0x47 // Computes a SHA-256 or HMAC/SHA digest for general purpose use by the system.
+#define COMMAND_OPCODE_SHA      0x47 // Computes a SHA-256 or HMAC/SHA digest for general purpose use by the system.
 #define COMMAND_OPCODE_GENKEY   0x40 // Creates a key (public and/or private) and stores it in a memory key slot
 #define COMMAND_OPCODE_NONCE    0x16 //
 #define COMMAND_OPCODE_SIGN     0x41 // Create an ECC signature with contents of TempKey and designated key slot

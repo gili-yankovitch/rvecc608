@@ -10,18 +10,63 @@
 #endif
 
 static volatile uint8_t i2cWriteBuffer[255] = {0x00};
+volatile uint8_t i2cReadBuffer[255] = {0x00};
+
+uint16_t crc16(const uint8_t *data, uint16_t length)
+{
+    uint8_t counter;
+    uint16_t crc_register = 0;
+    uint16_t polynom = 0x8005;
+    uint8_t shift_register;
+    uint8_t data_bit, crc_bit;
+    for (counter = 0; counter < length; counter++)
+    {
+        for (shift_register = 0x01; shift_register > 0x00; shift_register <<= 1)
+        {
+            data_bit = (data[counter] & shift_register) ? 1 : 0;
+            crc_bit = crc_register >> 15;
+            crc_register <<= 1;
+            if (data_bit != crc_bit)
+            {
+                crc_register ^= polynom;
+            }
+        }
+    }
+
+    return crc_register;
+}
 
 static void onWrite(uint8_t offset, uint8_t length)
 {
     uint8_t * buf = (uint8_t *)&i2cWriteBuffer[offset];
 
-    printf("Received: %s\r\n", buf);
+    if (length < 1 + 2) // CMD + 16-bit CRC
+    {
+        return;
+    }
+
+    // Verify CRC
+    if (crc16(buf + 1, length - 3) != *((uint16_t *)(buf + length - 2)))
+    {
+        return;
+    }
+
+    // Copy the data
+    memcpy(&req, buf, length - 2);
+
+    if (req.len != length - 1)
+    {
+        return;
+    }
+
+
+    reqFlag = true;
 }
 
 static uint8_t onRead(uint8_t offset)
 {
-    uint8_t data[] = "Goodbye!";
-    return data[offset];
+    printf("Reading response offset %d: %c\r\n", offset, i2cReadBuffer[offset]);
+    return i2cReadBuffer[offset];
 }
 
 static void SetupI2CSlave(uint8_t address, i2c_write_callback_t write_callback, i2c_read_callback_t read_callback)
