@@ -124,17 +124,17 @@ int wctomb(char *s, wchar_t wc)
 	return wcrtomb(s, wc, 0);
 }
 #endif
-size_t strlen(const char *s) { const char *a = s;for (; *s; s++);return s-a; }
-size_t strnlen(const char *s, size_t n) { const char *p = memchr(s, 0, n); return p ? p-s : n;}
-void *memset(void *dest, int c, size_t n) { unsigned char *s = dest; for (; n; n--, s++) *s = c; return dest; }
-char *strcpy(char *d, const char *s) { for (; (*d=*s); s++, d++); return d; }
-char *strncpy(char *d, const char *s, size_t n) { for (; n && (*d=*s); n--, s++, d++); return d; }
-int strcmp(const char *l, const char *r)
+size_t __attribute__(( section(".topflash.text") )) strlen(const char *s) { const char *a = s;for (; *s; s++);return s-a; }
+size_t __attribute__(( section(".topflash.text") )) strnlen(const char *s, size_t n) { const char *p = memchr(s, 0, n); return p ? p-s : n;}
+void __attribute__(( section(".topflash.text") )) *memset(void *dest, int c, size_t n) { unsigned char *s = dest; for (; n; n--, s++) *s = c; return dest; }
+char __attribute__(( section(".topflash.text") )) *strcpy(char *d, const char *s) { for (; (*d=*s); s++, d++); return d; }
+char __attribute__(( section(".topflash.text") )) *strncpy(char *d, const char *s, size_t n) { for (; n && (*d=*s); n--, s++, d++); return d; }
+int __attribute__(( section(".topflash.text") )) strcmp(const char *l, const char *r)
 {
 	for (; *l==*r && *l; l++, r++);
 	return *(unsigned char *)l - *(unsigned char *)r;
 }
-int strncmp(const char *_l, const char *_r, size_t n)
+int __attribute__(( section(".topflash.text") )) strncmp(const char *_l, const char *_r, size_t n)
 {
 	const unsigned char *l=(void *)_l, *r=(void *)_r;
 	if (!n--) return 0;
@@ -276,7 +276,7 @@ static char *twoway_strstr(const unsigned char *h, const unsigned char *n)
 	}
 }
 
-char *strstr(const char *h, const char *n)
+char * strstr(const char *h, const char *n)
 {
 	/* Return immediately on empty needle */
 	if (!n[0]) return (char *)h;
@@ -294,7 +294,7 @@ char *strstr(const char *h, const char *n)
 	return twoway_strstr((void *)h, (void *)n);
 }
 
-char *strchr(const char *s, int c)
+char * __attribute__(( section(".topflash.text") )) strchr(const char *s, int c)
 {
 	c = (unsigned char)c;
 	if (!c) return (char *)s + strlen(s);
@@ -303,7 +303,7 @@ char *strchr(const char *s, int c)
 }
 
 
-void *__memrchr(const void *m, int c, size_t n)
+void * __attribute__(( section(".topflash.text") )) __memrchr(const void *m, int c, size_t n)
 {
 	const unsigned char *s = m;
 	c = (unsigned char)c;
@@ -311,12 +311,12 @@ void *__memrchr(const void *m, int c, size_t n)
 	return 0;
 }
 
-char *strrchr(const char *s, int c)
+char * __attribute__(( section(".topflash.text") )) strrchr(const char *s, int c)
 {
 	return __memrchr(s, c, strlen(s) + 1);
 }
 
-void *memcpy(void *dest, const void *src, size_t n)
+void * __attribute__(( section(".topflash.text") )) memcpy(void *dest, const void *src, size_t n)
 {
 	unsigned char *d = dest;
 	const unsigned char *s = src;
@@ -324,7 +324,7 @@ void *memcpy(void *dest, const void *src, size_t n)
 	return dest;
 }
 
-int memcmp(const void *vl, const void *vr, size_t n)
+int __attribute__(( section(".topflash.text") )) memcmp(const void *vl, const void *vr, size_t n)
 {
 	const unsigned char *l=vl, *r=vr;
 	for (; n && *l == *r; n--, l++, r++);
@@ -332,7 +332,7 @@ int memcmp(const void *vl, const void *vr, size_t n)
 }
 
 
-void *memmove(void *dest, const void *src, size_t n)
+void __attribute__(( section(".topflash.text") )) *memmove(void *dest, const void *src, size_t n)
 {
 	char *d = dest;
 	const char *s = src;
@@ -348,7 +348,7 @@ void *memmove(void *dest, const void *src, size_t n)
 
 	return dest;
 }
-void *memchr(const void *src, int c, size_t n)
+void __attribute__(( section(".topflash.text") )) *memchr(const void *src, int c, size_t n)
 {
 	const unsigned char *s = src;
 	c = (unsigned char)c;
@@ -450,7 +450,7 @@ mini_itoa(long value, unsigned int radix, int uppercase, int unsig,
 	return len;
 }
 
-static int
+static int __attribute__(( section(".topflash.text") ))
 mini_pad(char* ptr, int len, char pad_char, int pad_to, char *buffer)
 {
 	int i;
@@ -708,12 +708,13 @@ void DefaultIRQHandler( void )
  * 			The sys clock is switched to HSI.
  * 			Clears the CSSF flag in RCC->INTR
  */
-void NMI_RCC_CSS_IRQHandler( void )
+void __attribute__(( section(".topflash.text") )) NMI_RCC_CSS_IRQHandler( void )
 {
 	RCC->INTR |= RCC_CSSC;	// clear the clock security int flag
 }
 
-void NMI_Handler( void ) 				 __attribute__((section(".text.vector_handler"))) __attribute((weak,alias("NMI_RCC_CSS_IRQHandler"))) __attribute__((used));
+// void NMI_Handler( void ) 				 __attribute__((section(".text.vector_handler"))) __attribute((weak,alias("NMI_RCC_CSS_IRQHandler"))) __attribute__((used));
+void NMI_Handler( void ) 				 __attribute__((section(".topflash.text"))) __attribute((weak,alias("NMI_RCC_CSS_IRQHandler"))) __attribute__((used));
 #else
 void NMI_Handler( void )                 __attribute__((section(".text.vector_handler"))) __attribute((weak,alias("DefaultIRQHandler"))) __attribute__((used));
 #endif
