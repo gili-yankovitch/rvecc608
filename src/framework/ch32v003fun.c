@@ -680,6 +680,7 @@ void __libc_init_array(void);
 #endif
 
 int main() __attribute__((used));
+void boot() __attribute__((used));
 void SystemInit( void ) __attribute__((used));
 
 extern uint32_t * _sbss;
@@ -898,7 +899,7 @@ void InterruptVectorDefault()
 	asm volatile( ".option   pop;\n");
 }
 
-void handle_reset()
+void __attribute__(( section(".topflash.text") )) handle_reset()
 {
 	asm volatile( "\n\
 .option push\n\
@@ -959,8 +960,8 @@ asm volatile(
 
 	// set mepc to be main as the root app.
 asm volatile(
-"	csrw mepc, %[main]\n"
-"	mret\n" : : [main]"r"(main) );
+"	csrw mepc, %[boot]\n"
+"	mret\n" : : [boot]"r"(boot) );
 }
 
 #elif defined(CH32V10x) || defined(CH32V20x) || defined(CH32V30x)
@@ -969,7 +970,7 @@ void Init() 				   __attribute((section(".init"))) __attribute((used));
 void InterruptVector()         __attribute__((naked)) __attribute((section(".vector"))) __attribute((weak,alias("InterruptVectorDefault")));
 void InterruptVectorDefault()  __attribute__((naked)) __attribute((section(".vector")));
 
-void handle_reset( void ) __attribute__((section(".text.handle_reset")));
+// GY: void handle_reset( void ) __attribute__((section(".text.handle_reset")));
 
 void Init()
 {
@@ -1142,7 +1143,7 @@ void InterruptVectorDefault()
 
 }
 
-void handle_reset( void )
+void __attribute__(( section(".topflash.text") )) handle_reset( void )
 {
 	asm volatile( "\n\
 .option push\n\
@@ -1223,7 +1224,7 @@ void handle_reset( void )
 #endif
 
 #if defined( FUNCONF_USE_UARTPRINTF ) && FUNCONF_USE_UARTPRINTF
-void SetupUART( int uartBRR )
+void __attribute__(( section(".topflash.text") )) SetupUART( int uartBRR )
 {
 #ifdef CH32V003
 	// Enable GPIOD and UART.
@@ -1241,16 +1242,22 @@ void SetupUART( int uartBRR )
 #endif
 
 	// 115200, 8n1.  Note if you don't specify a mode, UART remains off even when UE_Set.
-	USART1->CTLR1 = USART_WordLength_8b | USART_Parity_No | USART_Mode_Tx;
+	USART1->CTLR1 = USART_WordLength_8b |
+	                USART_Parity_No |
+	                USART_Mode_Tx |
+	                USART_Mode_Rx /* |
+	                USART_CTLR1_RWU*/;
 	USART1->CTLR2 = USART_StopBits_1;
-	USART1->CTLR3 = USART_HardwareFlowControl_None;
+	USART1->CTLR3 = USART_HardwareFlowControl_None/* |
+	    USART_CTLR3_DMAR |
+	    USART_CTLR3_DMAT*/;
 
 	USART1->BRR = uartBRR;
 	USART1->CTLR1 |= CTLR1_UE_Set;
 }
 
 // For debug writing to the UART.
-int _write(int fd, const char *buf, int size)
+int __attribute__(( section(".topflash.text") )) _write(int fd, const char *buf, int size)
 {
 	for(int i = 0; i < size; i++){
 	    while( !(USART1->STATR & USART_FLAG_TC));
@@ -1409,7 +1416,7 @@ void DelaySysTick( uint32_t n )
 #endif
 }
 
-void SystemInit()
+void __attribute__(( section(".topflash.text") )) SystemInit()
 {
 #if FUNCONF_HSE_BYPASS
 	#define HSEBYP (1<<18)

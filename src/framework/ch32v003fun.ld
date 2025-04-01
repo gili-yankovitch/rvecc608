@@ -3,7 +3,8 @@ ENTRY( InterruptVector )
 MEMORY
 {
 #if TARGET_MCU_LD == 0
-	FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 16K
+	FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 12K
+	FLASH_TOP (rx) : ORIGIN = 0x00003000, LENGTH = 4K
 	RAM (xrw)  : ORIGIN = 0x20000000, LENGTH = 2K
 #elif TARGET_MCU_LD == 1
 	#if MCU_PACKAGE == 1
@@ -64,6 +65,14 @@ SECTIONS
       *(.gnu.linkonce.t.*)
       . = ALIGN(4);
     } >FLASH AT>FLASH 
+
+    .topflash :
+    {
+      KEEP(*(.topflash.text))         /* explicitly marked */
+      KEEP(*(.topflash.rodata))
+      KEEP(*(.topflash.*))       /* wildcard for sub-sections */
+    } >FLASH_TOP AT>FLASH_TOP
+
 
     .fini :
     {

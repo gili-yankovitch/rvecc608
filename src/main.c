@@ -7,6 +7,8 @@
 #include <aes.h>
 #include <i2c.h>
 #include <atecc608xx.h>
+#include <uart.h>
+#include <ota.h>
 
 #define FLASH_ADDR 0x08000000
 #define FLASH_SIZE 0x00004000
@@ -141,9 +143,9 @@ int main()
 #endif
     uint32_t rdata;
 
-    SystemInit();
+    // SystemInit();
 
-    SetupUART(UART_BRR);
+    // uartInit();
 
     // Enable GPIOs
     funGpioInitAll();
@@ -170,6 +172,7 @@ int main()
 
     // Optional: For blinking LED
     funPinMode(PC3, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP);
+
 #if 0
     uECC_set_rng(&RNG);
     cryptoTest();
@@ -200,7 +203,14 @@ int main()
 done:
     for (;;)
     {
-        handleRequest();
+        if (uartAvailable())
+        {
+            updateInit();
+            recvChunk();
+            // printf("Received: %d\r\n", _gets());
+        }
+
+        // handleRequest();
     }
 
     return 0;

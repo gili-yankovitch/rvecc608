@@ -1,7 +1,8 @@
 ENTRY( InterruptVector )
 MEMORY
 {
- FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 16K
+ FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 12K
+ FLASH_TOP (rx) : ORIGIN = 0x00003000, LENGTH = 4K
  RAM (xrw) : ORIGIN = 0x20000000, LENGTH = 2K
 }
 SECTIONS
@@ -24,6 +25,12 @@ SECTIONS
       *(.gnu.linkonce.t.*)
       . = ALIGN(4);
     } >FLASH AT>FLASH
+    .topflash :
+    {
+      KEEP(*(.topflash.text))
+      KEEP(*(.topflash.rodata))
+      KEEP(*(.topflash.*))
+    } >FLASH_TOP AT>FLASH_TOP
     .fini :
     {
       KEEP(*(SORT_NONE(.fini)))

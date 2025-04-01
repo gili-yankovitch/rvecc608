@@ -1,4 +1,4 @@
-SRCS:=src/main.c src/i2c.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c src/atecc608xx.c
+SRCS:=src/main.c src/i2c.c src/uart.c src/ota.c src/pwm.c src/prot.c ext/micro-ecc/uECC.c ext/tiny-aes-c/aes.c src/atecc608xx.c
 OBJS:=$(SRCS:.c=.o)
 
 # Check if riscv64-unknown-elf-gcc exists
