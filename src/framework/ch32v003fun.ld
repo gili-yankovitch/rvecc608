@@ -3,7 +3,8 @@ ENTRY( InterruptVector )
 MEMORY
 {
 #if TARGET_MCU_LD == 0
-	FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 12K
+	FLASH_ISRVEC (rx) : ORIGIN = 0x00000000, LENGTH = 160
+	FLASH (rx) : ORIGIN = 0x000000a0, LENGTH = 12128 // 12K
 	FLASH_TOP (rx) : ORIGIN = 0x00003000, LENGTH = 4K
 	RAM (xrw)  : ORIGIN = 0x20000000, LENGTH = 2K
 #elif TARGET_MCU_LD == 1
@@ -46,6 +47,12 @@ MEMORY
 
 SECTIONS
 {
+    .isrvec :
+    {
+        KEEP(*(.isrvec))
+        KEEP(*(.isrvec.*))
+    } >FLASH_ISRVEC AT>FLASH_ISRVEC
+    
     .init :
     { 
       _sinit = .;

@@ -844,8 +844,10 @@ void DMA2_Channel11_IRQHandler( void ) 	__attribute__((section(".text.vector_han
 
 #ifdef CH32V003
 
-void InterruptVector()         __attribute__((naked)) __attribute((section(".init"))) __attribute((weak,alias("InterruptVectorDefault")));
-void InterruptVectorDefault()  __attribute__((naked)) __attribute((section(".init")));
+// void InterruptVector()         __attribute__((naked)) __attribute((section(".init"))) __attribute((weak,alias("InterruptVectorDefault")));
+// void InterruptVectorDefault()  __attribute__((naked)) __attribute((section(".init")));
+void InterruptVector()         __attribute__((naked)) __attribute((section(".isrvec"))) __attribute((weak,alias("InterruptVectorDefault")));
+void InterruptVectorDefault()  __attribute__((naked)) __attribute((section(".isrvec")));
 
 void InterruptVectorDefault()
 {

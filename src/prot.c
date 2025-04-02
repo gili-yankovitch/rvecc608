@@ -39,56 +39,56 @@
 #define FLASH_EOP_BIT        (1 << 5) // End of programming bit
 
 
-static inline void flashFlockUnlock()
+static inline void __attribute__(( section(".topflash.text") )) flashFlockUnlock()
 {
     *FLASH_MODEKEYR = FLASH_KEY1;
     *FLASH_MODEKEYR = FLASH_KEY2;
 }
 
-static inline void flashFlockLock()
+static inline void __attribute__(( section(".topflash.text") )) flashFlockLock()
 {
     *FLASH_CTLR |= FLASH_FLOCK_BIT;
 }
 
-static inline void flashUnlock()
+static inline void __attribute__(( section(".topflash.text") )) flashUnlock()
 {
     *FLASH_KEYR = FLASH_KEY1;
     *FLASH_KEYR = FLASH_KEY2;
 }
 
-static inline void flashLock()
+static inline void __attribute__(( section(".topflash.text") )) flashLock()
 {
     *FLASH_CTLR |= FLASH_LOCK_BIT;
 }
 
-static inline void flashUnlockOBKEYR()
+static inline void __attribute__(( section(".topflash.text") )) flashUnlockOBKEYR()
 {
     *FLASH_OBKEYR = FLASH_KEY1;
     *FLASH_OBKEYR = FLASH_KEY2;
 }
 
-static inline void enableFlashProgramming()
+static inline void __attribute__(( section(".topflash.text") )) enableFlashProgramming()
 {
     *FLASH_CTLR |= FLASH_PG_BIT; // Set PG bit
 }
 
-static inline void disableFlashProgramming()
+static inline void __attribute__(( section(".topflash.text") )) disableFlashProgramming()
 {
     *FLASH_CTLR &= ~FLASH_PG_BIT; // Set PG bit
 }
 
-void flashBusy()
+void __attribute__(( section(".topflash.text") )) flashBusy()
 {
     while (((*FLASH_STATR) & FLASH_BSY_BIT)) ;
 }
 
-static inline void flashEOP()
+static inline void __attribute__(( section(".topflash.text") )) flashEOP()
 {
     while ((((*FLASH_STATR) & FLASH_BSY_BIT)) && (!((*FLASH_STATR) & FLASH_EOP_BIT))) ;
     *FLASH_STATR |= FLASH_EOP_BIT;
 }
 
-void flashPageErase(uint32_t address)
+void __attribute__((section(".topflash.text"))) flashPageErase(uint32_t address)
 {
     // #1
     flashUnlock();
@@ -121,7 +121,7 @@ void flashPageErase(uint32_t address)
     flashBusy();
 }
 
-void _flashPageErase(uint32_t address)
+void __attribute__((section(".topflash.text"))) _flashPageErase(uint32_t address)
 {
     flashUnlock();  // Unlock flash for writing
     flashBusy();
@@ -143,14 +143,14 @@ void _flashPageErase(uint32_t address)
     flashLock();  // Lock flash again
 }
 
-void flashRead(uint32_t addr, void * pdata, size_t len)
+void __attribute__((section(".topflash.text"))) flashRead(uint32_t addr, void * pdata, size_t len)
 {
     memcpy(pdata, (void *)addr, len);
 }
 
 #define WRITE_BLOCK_SIZE 64
 
-void _flashWrite(uint32_t addr, uint32_t * data)
+void __attribute__((section(".topflash.text"))) _flashWrite(uint32_t addr, uint32_t * data)
 {
     int i;
 
@@ -189,7 +189,7 @@ void _flashWrite(uint32_t addr, uint32_t * data)
     flashBusy();
 }
 
-void flashWrite(uint32_t addr, void * pdata, size_t len)
+void __attribute__((section(".topflash.text"))) flashWrite(uint32_t addr, void * pdata, size_t len)
 {
     int i;
     uint8_t tmp[WRITE_BLOCK_SIZE] = { 0 };
@@ -294,7 +294,7 @@ static void _flashReadUnprotect()
     *RDPR = RDPR_OFF;
 }
 
-int flashReadProtect()
+int __attribute__((section(".topflash.text"))) flashReadProtect()
 {
     if (!FLASH_RDPR)
     {
@@ -305,7 +305,7 @@ int flashReadProtect()
     return 0;
 }
 
-int flashReadUnprotect()
+int __attribute__((section(".topflash.text"))) flashReadUnprotect()
 {
     if (FLASH_RDPR)
     {
