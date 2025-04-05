@@ -4,7 +4,7 @@ MEMORY
 {
 #if TARGET_MCU_LD == 0
 	FLASH_ISRVEC (rx) : ORIGIN = 0x00000000, LENGTH = 160
-	FLASH (rx) : ORIGIN = 0x000000a0, LENGTH = 12128 // 12K
+	FLASH (rx) : ORIGIN = 0x000000a0, LENGTH = 12128 // 12K - 160
 	FLASH_TOP (rx) : ORIGIN = 0x00003000, LENGTH = 4K
 	RAM (xrw)  : ORIGIN = 0x20000000, LENGTH = 2K
 #elif TARGET_MCU_LD == 1
@@ -52,10 +52,16 @@ SECTIONS
         KEEP(*(.isrvec))
         KEEP(*(.isrvec.*))
     } >FLASH_ISRVEC AT>FLASH_ISRVEC
+
+    .main :
+    {
+        KEEP(*(.main))
+        KEEP(*(.main.*))
+    } >FLASH AT>FLASH
     
     .init :
     { 
-      _sinit = .;
+      // _sinit = .;
       . = ALIGN(4);
       KEEP(*(SORT_NONE(.init)))
       . = ALIGN(4);

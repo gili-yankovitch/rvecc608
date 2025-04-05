@@ -13,9 +13,13 @@ SECTIONS
         KEEP(*(.isrvec))
         KEEP(*(.isrvec.*))
     } >FLASH_ISRVEC AT>FLASH_ISRVEC
+    .main :
+    {
+        KEEP(*(.main))
+        KEEP(*(.main.*))
+    } >FLASH AT>FLASH
     .init :
     {
-      _sinit = .;
       . = ALIGN(4);
       KEEP(*(SORT_NONE(.init)))
       . = ALIGN(4);

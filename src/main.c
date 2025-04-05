@@ -10,9 +10,6 @@
 #include <uart.h>
 #include <ota.h>
 
-#define FLASH_ADDR 0x08000000
-#define FLASH_SIZE 0x00004000
-
 static int readAnalog()
 {
     return SysTick->CNT ^ GPIO_analogRead(GPIOv_from_PORT_PIN(GPIO_port_D, 3));
@@ -123,9 +120,8 @@ static void cryptoTest()
 }
 
 
-int main()
+int  __attribute__(( used, section(".main") )) main()
 {
-    uint32_t addr;
 #if 1
     uint32_t data[16] = {
         0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
@@ -178,7 +174,7 @@ int main()
     cryptoTest();
 
     // addr = FLASH_ADDR + FLASH_SIZE - 512; // sizeof(uint16_t) * 2;
-    addr = FLASH_ADDR + FLASH_SIZE - 129; // sizeof(uint16_t) * 2;
+    uint32_t addr = FLASH_ADDR + FLASH_SIZE - 129; // sizeof(uint16_t) * 2;
 
     // Reading
     flashRead(addr, &rdata, sizeof(rdata));
