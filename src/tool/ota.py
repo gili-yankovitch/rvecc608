@@ -2,6 +2,7 @@
 
 from Crypto.Cipher import AES
 from struct import pack, unpack
+import progressbar
 import argparse
 import os
 import serial
@@ -9,10 +10,11 @@ import serial
 iv = bytes([ 0 ] * AES.block_size)
 key = bytes([ x for x in range(AES.block_size) ])
 
+DEBUG = False
+
 START_OFFSET = 0xc0
 END_OFFSET = 0x3000
 HEADER_SIZE = 8
-# CHUNK_SIZE = AES.block_size - HEADER_SIZE
 CHUNK_SIZE = 64
 PAD_SIZE = AES.block_size - (HEADER_SIZE + CHUNK_SIZE) % AES.block_size
 TOTAL_SIZE = HEADER_SIZE + CHUNK_SIZE + PAD_SIZE
@@ -62,36 +64,45 @@ def main(filename):
 
         exit(1)
 
-    # with open(filename, "r") as f:
-        # data = pad(f.read().encode(), AES.block_size)
-
     data = prepare_image(filename)
 
+    # Divide into chunks
     chunks = [ chunk(data, START_OFFSET + addr, len(data)) for addr in range(0, len(data), CHUNK_SIZE) ]
 
-    print(chunks[:2])
-    print(len(chunks[1]))
+    # Encrypt it all in one go
     plaintext = b"".join(chunks)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(plaintext)
 
+    # Open a serial connection to the device
     c = conn()
+
+    print("Flashing...")
+
+    bar = progressbar.ProgressBar(maxval=len(ciphertext), \
+        widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    bar.start()
 
     # Write chunk-by-chunk
     for i in range(0, len(ciphertext), TOTAL_SIZE):
-        print(f"Sent chunk {i // TOTAL_SIZE} address {hex(START_OFFSET + (i // TOTAL_SIZE) * CHUNK_SIZE)}...")
+        if not DEBUG:
+            bar.update(i + TOTAL_SIZE)
+        else:
+            print(f"Sent chunk {i // TOTAL_SIZE} address {hex(START_OFFSET + (i // TOTAL_SIZE) * CHUNK_SIZE)}...")
         c.write(ciphertext[i:i + TOTAL_SIZE])
         data = c.read(1)
-        print("Recvd from chip:", data)
+
+        if DEBUG:
+            print("Recvd from chip:", data)
 
         if data != b"V":
             print("Failed flashing. Reason:",)
             while True:
-                print(c.read(1), end = "")
-        # if i == AES.block_size:
-        #     c.close()
-        #     exit(1)
+                print(c.read(1))
     c.close()
+
+    bar.finish()
+    print("Done")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Sword of Secrets OTA Update")
