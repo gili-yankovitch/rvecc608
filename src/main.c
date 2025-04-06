@@ -122,27 +122,6 @@ static void cryptoTest()
 
 int  __attribute__(( used, section(".main") )) main()
 {
-#if 1
-    uint32_t data[16] = {
-        0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
-        0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
-        0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
-        0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98
-        };
-#else
-    uint32_t data[16] = {
-        0x01234567, 0x89ABCDEF, 0x01234567, 0x89ABCDEF,
-        0x01234567, 0x89ABCDEF, 0x01234567, 0x89ABCDEF,
-        0x01234567, 0x89ABCDEF, 0x01234567, 0x89ABCDEF,
-        0x01234567, 0x89ABCDEF, 0x01234567, 0x89ABCDEF
-        };
-#endif
-    uint32_t rdata;
-
-    // SystemInit();
-
-    // uartInit();
-
     // Enable GPIOs
     funGpioInitAll();
 
@@ -172,40 +151,21 @@ int  __attribute__(( used, section(".main") )) main()
 #if 0
     uECC_set_rng(&RNG);
     cryptoTest();
-
-    // addr = FLASH_ADDR + FLASH_SIZE - 512; // sizeof(uint16_t) * 2;
-    uint32_t addr = FLASH_ADDR + FLASH_SIZE - 129; // sizeof(uint16_t) * 2;
-
-    // Reading
-    flashRead(addr, &rdata, sizeof(rdata));
-
-    printf("[READ #0] Data at address 0x%lx: %lx\r\n", addr, rdata);
-
-    flashPageErase(addr);
-
-    // Reading
-    flashRead(addr, &rdata, sizeof(rdata));
-
-    printf("[READ #1] AFTER ERASE Data at address 0x%lx: %lx\r\n", addr, rdata);
-
-    flashWrite(addr, &data, sizeof(data));
-    // _flashWrite(addr, &data);
-
-    // Reading
-    flashRead(addr, &rdata, sizeof(rdata));
-
-    printf("[READ #2] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr, rdata);
 #endif
+
 done:
     for (;;)
     {
-        if (uartAvailable())
-        {
-            updateInit();
-            recvChunk();
-            // printf("Received: %d\r\n", _gets());
-        }
+#if 0
+        printf("Flashing test...\r\n");
 
+        Delay_Ms(1000);
+#else
+        funDigitalWrite(PC3, FUN_HIGH);
+        Delay_Ms(100);
+        funDigitalWrite(PC3, FUN_LOW);
+        Delay_Ms(100);
+#endif
         // handleRequest();
     }
 

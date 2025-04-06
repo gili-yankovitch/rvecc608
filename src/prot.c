@@ -189,7 +189,7 @@ void __attribute__((section(".topflash.text"))) _flashWrite(uint32_t addr, uint3
     flashBusy();
 }
 
-void __attribute__((section(".topflash.text"))) flashWrite(uint32_t addr, void * pdata, size_t len)
+void __attribute__((noinline, used, section(".topflash.text"))) flashWrite(uint32_t addr, void * pdata, size_t len)
 {
     int i;
     uint8_t tmp[WRITE_BLOCK_SIZE] = { 0 };

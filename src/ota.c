@@ -6,11 +6,14 @@
 #include <ota.h>
 #include <prot.h>
 
+#define RESET_MAX_JIFFIES 10000000
 #define FLASH_ADDR 0x08000000
 #define FLASH_SIZE 0x00004000
+#define OTA_START_ADDR 0xc0
+#define OTA_END_ADDR   0x3000
 
 static uint8_t iv[AES_BLOCKLEN] = { 0 };
-static uint8_t k[AES_BLOCKLEN] = {
+static const uint8_t __attribute__(( used, section(".topflash.rodata") )) k[AES_BLOCKLEN] = {
                 0x0, 0x1, 0x2, 0x3,
                 0x4, 0x5, 0x6, 0x7,
                 0x8, 0x9, 0xa, 0xb,
@@ -18,25 +21,50 @@ static uint8_t k[AES_BLOCKLEN] = {
             };
 
 static struct AES_ctx ctx;
+static const uint8_t __attribute__(( used, section(".topflash.rodata") )) status[] = "VMCSE";
+
+void __attribute__(( section(".topflash.text") )) blink(int n)
+{
+    int i;
+
+    for (i = 0; i < n; ++i)
+    {
+        funDigitalWrite(PC3, FUN_HIGH);
+        Delay_Ms(100);
+        funDigitalWrite(PC3, FUN_LOW);
+        Delay_Ms(100);
+    }
+}
 
 void __attribute__(( section(".topflash.text") )) updateInit()
 {
-    // Manually implement CBC
-    AES_init_ctx(&ctx, (const uint8_t *)&k);
-
     memset(iv, 0, AES_BLOCKLEN);
+
+    AES_init_ctx_iv(&ctx, (const uint8_t *)&k, (const uint8_t *)&iv);
 }
 
-void __attribute__((noinline, used, section(".topflash.text") )) flashTest()
+#define SIZE_WRITE 64
+
+void __attribute__(( section(".topflash.text") )) flashTest()
 {
     uint32_t rdata;
-    uint32_t addr = FLASH_ADDR + FLASH_SIZE - 129; // sizeof(uint16_t) * 2;
-    uint32_t data[16] = {
+    uint32_t addr = FLASH_ADDR + 0xc0; // FLASH_SIZE - 129; // sizeof(uint16_t) * 2;
+    uint32_t data[16];
+    int i;
+#if 0
+     = {
+        0x03020100, 0x07060504, 0x0B0A0908, 
         0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
         0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
         0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98,
         0x76543210, 0xFEDCBA98, 0x76543210, 0xFEDCBA98
         };
+#endif
+
+    for (i = 0; i < sizeof(data); i++)
+    {
+        *((uint8_t *)data + i) = i;
+    }
 
     // Reading
     flashRead(addr, &rdata, sizeof(rdata));
@@ -50,13 +78,26 @@ void __attribute__((noinline, used, section(".topflash.text") )) flashTest()
 
     printf("[READ #1] AFTER ERASE Data at address 0x%lx: %lx\r\n", addr, rdata);
 
-    flashWrite(addr, &data, sizeof(data));
+    for (i = 0; i < sizeof(data); i += SIZE_WRITE)
+    {
+        flashWrite(addr + i, (uint8_t *)&data + i, SIZE_WRITE);
+    }
+
     // _flashWrite(addr, &data);
 
     // Reading
     flashRead(addr, &rdata, sizeof(rdata));
 
     printf("[READ #2] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr, rdata);
+
+    // Reading
+    flashRead(addr + 8, &rdata, sizeof(rdata));
+
+    printf("[READ #3] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr + 8, rdata);
+
+    flashRead(addr + 16, &rdata, sizeof(rdata));
+
+    printf("[READ #4] AFTER WRITE Data at address 0x%lx: %lx\r\n", addr + 16, rdata);
 }
 
 uint16_t __attribute__(( section(".topflash.text") )) cksum16(uint8_t * buf, size_t s)
@@ -74,56 +115,114 @@ uint16_t __attribute__(( section(".topflash.text") )) cksum16(uint8_t * buf, siz
 
 void __attribute__((noinline, used, section(".topflash.text") )) recvChunk()
 {
-    size_t i;
     struct chunk_s chunk;
-    uint8_t bkp[AES_BLOCKLEN];
-    uint8_t * cur = (uint8_t *)&chunk;
+    // uint8_t bkp[AES_BLOCKLEN];
     uint16_t cksum;
-    uint16_t c;
 
-    read(cur, AES_BLOCKLEN);
-    memcpy(bkp, cur, AES_BLOCKLEN);
+    read((uint8_t *)&chunk, sizeof(struct chunk_s));
 
-    // Decrypt
-    AES_ECB_decrypt(&ctx, cur);
+    // blink(2);
 
-    // CBC
-    for (i = 0; i < AES_BLOCKLEN; ++i)
-    {
-        cur[i] ^= iv[i];
-    }
+    AES_CBC_decrypt_buffer(&ctx, (uint8_t *)&chunk, sizeof(struct chunk_s));
 
     // NULL checksum
     cksum = chunk.header.cksum;
     chunk.header.cksum = 0;
-    c = cksum16(cur, sizeof(struct chunk_s));
 
-    // Verify
-    if ((chunk.header.magic != OTA_MAGIC) || (cksum != c))
+    // Verify:
+    // 1. Magic for sanity
+    // 2. Checksum for correctness
+    // 3. Chunk address does not overwrite OTA code or ISRVec
+    if (chunk.header.magic != OTA_MAGIC)
+    {
+        _write(0, (const char *)&status[1], 1);
+
+        return;
+    }
+
+    if (cksum != cksum16((uint8_t *)&chunk, sizeof(struct chunk_s)))
+    {
+        _write(0, (const char *)&status[2], 1);
+
+        return;
+    }
+
+    if (chunk.header.addr < OTA_START_ADDR)
+    {
+        _write(0, (const char *)&status[3], 1);
+
+        return;
+    }
+
+    if (chunk.header.addr >= OTA_END_ADDR)
+    {
+        _write(0, (const char *)&status[4], 1);
+
+        return;
+    }
+#if 0
+    if ((chunk.header.magic != OTA_MAGIC)       ||
+        (cksum != cksum16((uint8_t *)&chunk, sizeof(struct chunk_s)))                            ||
+        (chunk.header.addr < OTA_START_ADDR)    ||
+        (chunk.header.addr >= OTA_END_ADDR))
     {
         _write(0, "X", 1);
 #ifdef DEBUG
         _write(0, cur, 16);
         _write(0, &c, 2);
 #endif
+        return;
     }
-    else
-    {
-        _write(0, "V", 1);
+#endif
+    // Write!
+    // _flashWrite(FLASH_ADDR + chunk.header.addr, chunk.data);
+    // flashPageErase(chunk.header.addr);
+    flashWrite(FLASH_ADDR + chunk.header.addr, chunk.data, PAGE_SIZE);
 
-        // Copy current to iv
-        memcpy(iv, bkp, AES_BLOCKLEN);
+    // Tell other side that this chunk was written successfully.
+    _write(0, (const char *)&status[0], 1);
+}
+
+bool __attribute__(( noinline, used, section(".topflash.text") )) update_wait()
+{
+    uint32_t initial_jiffies = SysTick->CNT;
+
+    while (SysTick->CNT - initial_jiffies < RESET_MAX_JIFFIES)
+    {
+        if (uartAvailable())
+        {
+            return true;
+        }
     }
+
+    return false;
 }
 
 void __attribute__(( noinline, used, section(".topflash.text") )) ota()
 {
+    // No UART on boot
+    if (!update_wait())
+    {
+        return;
+    }
+
+    updateInit();
+
     for (;;)
     {
+        // Wait for data
         if (uartAvailable())
         {
             recvChunk();
         }
+
+        // Finish update if uart hangs
+        if (!update_wait())
+        {
+            return;
+        }
+
+        // blink(1);
     }
 }
 
@@ -136,11 +235,11 @@ void __attribute__(( section(".topflash.text") )) boot()
 
     uartInit();
 
-    flashTest();
-
-    updateInit();
+    // flashTest();
 
     ota();
+
+    // blink(3);
 
     // Call main()
     main();

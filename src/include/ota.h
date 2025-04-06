@@ -5,6 +5,7 @@
 #include <aes.h>
 
 #define OTA_MAGIC 0x1337
+#define PAGE_SIZE 64
 
 // AES Blocks are 16 bytes. Then data should be what remains of such block size
 struct chunk_header_s
@@ -18,7 +19,8 @@ struct chunk_header_s
 struct chunk_s
 {
     struct chunk_header_s header;
-    uint8_t data[AES_BLOCKLEN - sizeof(struct chunk_header_s)];
+    uint8_t data[PAGE_SIZE];
+    uint8_t _pad[AES_BLOCKLEN - (sizeof(struct chunk_header_s) + PAGE_SIZE) % AES_BLOCKLEN];
 };
 
 void updateInit();

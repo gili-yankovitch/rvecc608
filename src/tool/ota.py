@@ -9,10 +9,13 @@ import serial
 iv = bytes([ 0 ] * AES.block_size)
 key = bytes([ x for x in range(AES.block_size) ])
 
-START_OFFSET = 0xa0
+START_OFFSET = 0xc0
 END_OFFSET = 0x3000
 HEADER_SIZE = 8
-CHUNK_SIZE = AES.block_size - HEADER_SIZE
+# CHUNK_SIZE = AES.block_size - HEADER_SIZE
+CHUNK_SIZE = 64
+PAD_SIZE = AES.block_size - (HEADER_SIZE + CHUNK_SIZE) % AES.block_size
+TOTAL_SIZE = HEADER_SIZE + CHUNK_SIZE + PAD_SIZE
 
 def pad(x, m):
     p = m - (len(x) % m)
@@ -37,17 +40,21 @@ def chunk(data, addr, size):
         addr,   # Addr
         size,   # Size
         0       # CKSUM
-        ) + data[addr - START_OFFSET: addr - START_OFFSET + CHUNK_SIZE]
+        ) + data[addr - START_OFFSET : addr - START_OFFSET + CHUNK_SIZE] + bytes([PAD_SIZE] * PAD_SIZE)
 
     return c[:2 * 3] + pack("H", cksum16(c)) + c[2 * 4:]
 
 def prepare_image(filename):
     # Dissect the file.
-    # Start: 0xa0
+    # Start: 0xc0
     # End: 0x3000
 
     with open(filename, "rb") as f:
-        return f.read()[START_OFFSET:END_OFFSET]
+        if "hello" in filename:
+            # return bytes([x for x in range(START_OFFSET)]) + f.read()[START_OFFSET:END_OFFSET]
+            return bytes([x for x in range(256)]) + f.read()[START_OFFSET:END_OFFSET]
+        else:
+            return f.read()[START_OFFSET:END_OFFSET]
 
 def main(filename):
     if not os.path.exists(filename):
@@ -67,28 +74,23 @@ def main(filename):
     plaintext = b"".join(chunks)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(plaintext)
-    print(f"Filename: {filename}")
 
-    #cipher_text = bytes("Hello, world!!!\x00", "ascii")
     c = conn()
-    #print(f"Sending: {ciphertext}")
 
     # Write chunk-by-chunk
-    for i in range(0, len(chunks), AES.block_size):
-        c.write(ciphertext[i:i + AES.block_size])
+    for i in range(0, len(ciphertext), TOTAL_SIZE):
+        print(f"Sent chunk {i // TOTAL_SIZE} address {hex(START_OFFSET + (i // TOTAL_SIZE) * CHUNK_SIZE)}...")
+        c.write(ciphertext[i:i + TOTAL_SIZE])
         data = c.read(1)
-        print("Recvd from chip:", data, data == b"X")
+        print("Recvd from chip:", data)
 
-        if data == b"X":
-            print("Failed chunk")
-            print(c.read(16))
-            print(c.read(2))
-
-            print(chunks[1])
-
-        if i == AES.block_size:
-            c.close()
-            exit(1)
+        if data != b"V":
+            print("Failed flashing. Reason:",)
+            while True:
+                print(c.read(1), end = "")
+        # if i == AES.block_size:
+        #     c.close()
+        #     exit(1)
     c.close()
 
 if __name__ == "__main__":

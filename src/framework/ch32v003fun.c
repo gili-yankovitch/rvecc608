@@ -1260,7 +1260,7 @@ void __attribute__(( section(".topflash.text") )) SetupUART( int uartBRR )
 }
 
 // For debug writing to the UART.
-int __attribute__(( section(".topflash.text") )) _write(int fd, const char *buf, int size)
+int __attribute__(( noinline, used, section(".topflash.text") )) _write(int fd, const char *buf, int size)
 {
 	for(int i = 0; i < size; i++){
 	    while( !(USART1->STATR & USART_FLAG_TC));
